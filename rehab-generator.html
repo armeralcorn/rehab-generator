@@ -465,7 +465,8 @@ function buildPDF(){
   const fmtDate = date ? new Date(date+'T00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : '';
 
   const cards = program.map((ex,i)=>{
-    const imgPath = `exercise-images/${ex.image}`;
+    const baseURL = window.location.href.substring(0, window.location.href.lastIndexOf('/')+1);
+    const imgPath = baseURL+`exercise-images/${ex.image}`;
     return `
     <div class="pdf-ex-card">
       <div class="pdf-ex-header">
@@ -503,7 +504,7 @@ function buildPDF(){
       <div class="pdf-info-item"><label>Sport</label><span>${sport}</span></div>
       <div class="pdf-info-item"><label>Date</label><span>${fmtDate}</span></div>
       <div class="pdf-info-item pdf-info-full"><label>Diagnosis / Injury</label><span>${injury}</span></div>
-      ${notes?`<div class="pdf-info-item pdf-info-full"><label>Clinical Notes</label><span>${notes}</span></div>`:''}
+      
     </div>
     ${cards}
     <div class="pdf-footer">
@@ -533,11 +534,14 @@ function openPrintWindow(autoDownload){
   const fmtDate = date ? new Date(date+'T00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : '';
   const filename = (name.replace(/\s+/g,'_')||'athlete')+'_Rehab_'+(date||'today')+'.pdf';
 
+  // Build absolute base URL so images load correctly in the print window
+  const baseURL = window.location.href.substring(0, window.location.href.lastIndexOf('/')+1);
+
   // Get the base64 logo
   const logoSrc = document.querySelector('#pdf-output img')?.src || '';
 
   const cards = program.map((ex,i)=>{
-    const imgPath = 'exercise-images/'+ex.image;
+    const imgPath = baseURL+'exercise-images/'+ex.image;
     return `<div class="ex-card">
       <div class="ex-title">${i+1}. ${ex.name} <span class="ex-tag">${ex.phase}</span></div>
       <div class="photo-row">
@@ -550,7 +554,7 @@ function openPrintWindow(autoDownload){
     </div>`;
   }).join('');
 
-  const noteRow = notes ? `<tr><td colspan="3" class="info-label">Clinical Notes</td></tr><tr><td colspan="3" class="info-val">${notes}</td></tr>` : '';
+  const noteRow = '';
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
 <title>${name} Rehab Program</title>
