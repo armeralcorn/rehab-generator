@@ -82,7 +82,7 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#F5F5F5;color:#1D2
 .pdf-ex-card{border:1px solid #DCE3EB;border-radius:7px;padding:14px;margin-bottom:12px;page-break-inside:avoid}
 .pdf-ex-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
 .pdf-ex-title{font-size:17px;font-weight:700;color:#0057B8;text-transform:uppercase;letter-spacing:.02em}
-.pdf-photos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.pdf-photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-bottom:8px}
 .pdf-photo{background:#F5F5F5;border:1px dashed #DCE3EB;border-radius:5px;height:90px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;overflow:hidden}
 .pdf-photo img{width:100%;height:100%;object-fit:cover;border-radius:4px}
 .pdf-desc{font-size:12px;color:#444;line-height:1.6;margin-bottom:9px}
@@ -218,23 +218,25 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#F5F5F5;color:#1D2
 // Map of exercises that have individual cropped photos.
 // As you upload more batches to GitHub, add entries here.
 // Format: "original.JPG": ["photo-1.JPG", "photo-2.JPG", "photo-3.JPG"]
+// Each entry: array of ACTUAL distinct photo files (no padding/repeating)
+// Count of entries = number of photos to show in PDF
 const INDIVIDUAL_PHOTOS = {
   "3-way-banded-hamstring-stretch.JPG": ["3-way-banded-hamstring-stretch-1.JPG","3-way-banded-hamstring-stretch-2.JPG","3-way-banded-hamstring-stretch-3.JPG"],
-  "4-way-ankle.JPG": ["4-way-ankle-1.JPG","4-way-ankle-2.JPG","4-way-ankle-2.JPG"],
+  "4-way-ankle.JPG": ["4-way-ankle-1.JPG","4-way-ankle-2.JPG"],
   "4-way-wrist-isometric.JPG": ["4-way-wrist-isometric-1.JPG","4-way-wrist-isometric-2.JPG","4-way-wrist-isometric-3.JPG"],
-  "90-90-hip-mobility.JPG": ["90-90-hip-mobility-1.JPG","90-90-hip-mobility-2.JPG","90-90-hip-mobility-2.JPG"],
-  "90-90-twists.JPG": ["90-90-twists-1.JPG","90-90-twists-2.JPG","90-90-twists-2.JPG"],
-  "adduction-iso-trx-w-bridge.JPG": ["adduction-iso-trx-w-bridge-1.JPG","adduction-iso-trx-w-bridge-1.JPG","adduction-iso-trx-w-bridge-1.JPG"]
+  "90-90-hip-mobility.JPG": ["90-90-hip-mobility-1.JPG","90-90-hip-mobility-2.JPG"],
+  "90-90-twists.JPG": ["90-90-twists-1.JPG","90-90-twists-2.JPG"],
+  "adduction-iso-trx-w-bridge.JPG": ["adduction-iso-trx-w-bridge-1.JPG"]
 };
 
-// Helper: get the 3 photo paths for an exercise
+// Helper: get photo paths for an exercise.
+// Returns array of 1-3 paths (never pads/repeats).
 function getPhotos(baseImg, baseURL) {
   const individual = INDIVIDUAL_PHOTOS[baseImg];
   if (individual) {
-    // Use individually cropped photos — clean full images
     return individual.map(f => baseURL + f);
   } else {
-    // Fallback: CSS crop the original wide JPG into thirds
+    // CSS crop will split the wide JPG into 3 sections
     return [baseURL + baseImg, baseURL + baseImg, baseURL + baseImg];
   }
 }
@@ -492,18 +494,21 @@ function buildPDF(){
   const fmtDate = date ? new Date(date+'T00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}) : '';
 
   const previewBase = window.location.href.substring(0, window.location.href.lastIndexOf('/')+1);
+  // CSS crop positions for splitting a 1280x720 slide (photos in top 56%, 3 side-by-side)
+  const CROP_STYLE = 'width:340%;height:180%;object-fit:cover;display:block';
+  const CROP_POS   = ['3.25% 0%','46.75% 0%','93.5% 0%'];
   const cards = program.map((ex,i)=>{
     const photos = getPhotos(ex.image, previewBase);
     const isIndividual = !!INDIVIDUAL_PHOTOS[ex.image];
-    const iStyle = isIndividual ? 'width:100%;height:100%;object-fit:cover;object-position:50% 50%' : 'width:340%;height:200%;object-fit:cover';
-    const pos = isIndividual ? ['50% 50%','50% 50%','50% 50%'] : ['15.6% 25%','47.7% 25%','80.7% 25%'];
+    const photoCells = photos.map((src, pi) => {
+      const style = isIndividual
+        ? 'width:100%;height:100%;object-fit:cover;object-position:center;display:block'
+        : CROP_STYLE+';object-position:'+CROP_POS[pi];
+      return '<div class="pdf-photo"><img src="'+src+'" style="'+style+'" onerror="this.style.opacity=0"/></div>';
+    }).join('');
     return '<div class="pdf-ex-card">'
       + '<div class="pdf-ex-header"><div class="pdf-ex-title">'+(i+1)+'. '+ex.name+'</div></div>'
-      + '<div class="pdf-photos">'
-      + '<div class="pdf-photo"><img src="'+photos[0]+'" style="'+iStyle+';object-position:'+pos[0]+'" onerror="this.style.opacity=0"/></div>'
-      + '<div class="pdf-photo"><img src="'+photos[1]+'" style="'+iStyle+';object-position:'+pos[1]+'" onerror="this.style.opacity=0"/></div>'
-      + '<div class="pdf-photo"><img src="'+photos[2]+'" style="'+iStyle+';object-position:'+pos[2]+'" onerror="this.style.opacity=0"/></div>'
-      + '</div>'
+      + '<div class="pdf-photos">'+photoCells+'</div>'
       + '<div class="pdf-desc">'+ex.description+'</div>'
       + '<div class="pdf-rx">Reps <span>'+(ex.reps||'___')+'</span> &nbsp;/&nbsp; Hold for <span>'+(ex.hold||'___')+'</span> &nbsp;/&nbsp; Sets <span>'+(ex.sets||'___')+'</span></div>'
       + '</div>';
@@ -562,18 +567,20 @@ function openPrintWindow(autoDownload){
   // Get the base64 logo
   const logoSrc = document.querySelector('#pdf-output img')?.src || '';
 
+  const PCROP_STYLE = 'width:340%;height:180%;object-fit:cover;display:block';
+  const PCROP_POS   = ['3.25% 0%','46.75% 0%','93.5% 0%'];
   const cards = program.map((ex,i)=>{
     const photos = getPhotos(ex.image, baseURL);
     const isIndividual = !!INDIVIDUAL_PHOTOS[ex.image];
-    const iStyle = isIndividual ? 'width:100%;height:100%;object-fit:cover;object-position:50% 50%' : 'width:340%;height:200%;object-fit:cover';
-    const pos = isIndividual ? ['50% 50%','50% 50%','50% 50%'] : ['15.6% 25%','47.7% 25%','80.7% 25%'];
+    const photoCells = photos.map((src, pi) => {
+      const style = isIndividual
+        ? 'width:100%;height:100%;object-fit:cover;object-position:center;display:block'
+        : PCROP_STYLE+';object-position:'+PCROP_POS[pi];
+      return '<div class="photo-cell"><img src="' + src + '" style="' + style + '" onerror="this.style.opacity=0"/></div>';
+    }).join('');
     return '<div class="ex-card">'
       + '<div class="ex-title">' + (i+1) + '. ' + ex.name + '</div>'
-      + '<div class="photo-row">'
-      + '<div class="photo-cell"><img src="' + photos[0] + '" style="' + iStyle + ';object-position:' + pos[0] + '" onerror="this.style.opacity=0"/></div>'
-      + '<div class="photo-cell"><img src="' + photos[1] + '" style="' + iStyle + ';object-position:' + pos[1] + '" onerror="this.style.opacity=0"/></div>'
-      + '<div class="photo-cell"><img src="' + photos[2] + '" style="' + iStyle + ';object-position:' + pos[2] + '" onerror="this.style.opacity=0"/></div>'
-      + '</div>'
+      + '<div class="photo-row">' + photoCells + '</div>'
       + '<div class="ex-desc">' + ex.description + '</div>'
       + '<div class="ex-rx"><b>Reps</b> ' + (ex.reps||'___') + ' &nbsp;/&nbsp; <b>Hold for</b> ' + (ex.hold||'___') + ' &nbsp;/&nbsp; <b>Sets</b> ' + (ex.sets||'___') + '</div>'
       + '</div>';
@@ -600,7 +607,7 @@ function openPrintWindow(autoDownload){
   .ex-card{border:1px solid #DCE3EB;border-radius:7px;padding:12px;margin-bottom:10px;page-break-inside:avoid;break-inside:avoid}
   .ex-title{font-size:13pt;font-weight:700;color:#0057B8;text-transform:uppercase;letter-spacing:.02em;margin-bottom:7px}
   .ex-tag{font-size:7.5pt;font-weight:700;background:#E6F1FB;color:#185FA5;padding:2px 7px;border-radius:100px;vertical-align:middle;margin-left:5px;text-transform:none;letter-spacing:0}
-  .photo-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:7px}
+  .photo-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;margin-bottom:7px}
   .photo-cell{border:1px solid #DCE3EB;border-radius:4px;height:80px;overflow:hidden;background:#f5f5f5;display:flex;align-items:center;justify-content:center}
   .photo-cell img{width:100%;height:100%;object-fit:cover;display:block}
   .photo-ph{font-size:8pt;color:#999;text-align:center;padding:4px}
